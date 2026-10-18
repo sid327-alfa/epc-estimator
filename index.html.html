@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><title>Estimation des coûts EPC</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f7f9;--card:#fff;--tx:#1b2430;--mu:#667085;--bd:#d9dee5;--ac:#1f3864;--ac2:#2e75b6;--in:#fffbe0;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b222b;--tx:#e6eaf0;--mu:#97a3b3;--bd:#2d3742;--ac:#6ea8fe;--ac2:#4a90d9;--in:#262d22;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1b222b;--tx:#e6eaf0;--mu:#97a3b3;--bd:#2d3742;--ac:#6ea8fe;--ac2:#4a90d9;--in:#262d22;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+.w{max-width:1100px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:0 0 2px;color:var(--ac)}.sub{color:var(--mu);font-size:12px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+label{display:block;font-size:11px;color:var(--mu);margin-bottom:2px}
+input{width:100%;padding:6px;border:1px solid var(--bd);border-radius:6px;background:var(--in);color:var(--tx);font:inherit}
+.sc{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:760px}
+th{font-size:11px;text-align:right;color:var(--mu);padding:4px;border-bottom:1px solid var(--bd);white-space:nowrap}th:first-child,th:nth-child(2){text-align:left}
+td{padding:2px;border-bottom:1px solid var(--bd)}td input{padding:4px;min-width:62px}td:first-child input{min-width:190px}td:nth-child(2) input{min-width:50px;width:56px}
+td.n{text-align:right;white-space:nowrap;padding:4px 6px;font-variant-numeric:tabular-nums}
+.lh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.lh b{font-size:15px;color:var(--ac)}.t{font-variant-numeric:tabular-nums;font-weight:600}
+button{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer}
+button.p{background:var(--ac2);border-color:var(--ac2);color:#fff}button.x{padding:2px 7px;color:#c0392b}
+.bar{height:8px;background:var(--ac2);border-radius:4px}.row{display:grid;grid-template-columns:170px 1fr 130px;gap:8px;align-items:center;padding:3px 0}
+.tot td{border:0;padding:3px 6px}.big{font-size:17px;font-weight:700;color:var(--ac)}
+@media(max-width:560px){.row{grid-template-columns:110px 1fr 100px}}
+.tp{border:1px solid var(--bd);border-radius:8px;padding:10px;margin:6px 0 10px;background:var(--bg)}.pv{margin:6px 0 10px;font-size:13px}select{width:100%;padding:6px;border:1px solid var(--bd);border-radius:6px;background:var(--in);color:var(--tx);font:inherit}
+</style></head><body><div class="w">
+<h1>Estimation des coûts – projet EPC</h1>
+<div class="sub">Quantités × rendements × taux horaires + matières + engins, par corps d’état. Montants en DA. Valeurs de départ indicatives : à remplacer par vos données.</div>
+<div class="card"><div class="g" id="par"></div></div>
+<div class="card"><b>Synthèse par corps d’état</b><div id="syn" style="margin-top:8px"></div>
+<table class="tot" style="min-width:0;margin-top:8px"><tbody id="tot"></tbody></table></div>
+<div id="lots"></div><div class="card" id="lib"></div>
+<div class="card" style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="p" onclick="addLot()">+ Corps d’état</button><span id="exb" style="display:contents"><button class="p" onclick="expX()">Exporter Excel</button><button class="p" onclick="expP()">Exporter Primavera (CSV)</button><button onclick="expC()">Exporter CSV</button></span>
+<button onclick="if(confirm('Réinitialiser les données de départ ?')){S=def();save();build()}">Réinitialiser</button></div>
+</div>
+<script>
+const L=(d,u,q,r,m,e)=>({d,u,q,r,m,e});
+const def=()=>({nom:'Projet EPC – exemple',fg:12,al:5,bn:8,tva:19,lots:[
+{n:'Génie civil',t:1100,l:[L('Terrassement généraux','m³',20000,0.25,400,350),L('Béton armé (fondations, dallages)','m³',3000,7,32000,2500),L('Bâtiments industriels','m²',2500,18,38000,1200)]},
+{n:'Charpente métallique',t:1300,l:[L('Fourniture et montage charpente','t',800,42,290000,9000)]},
+{n:'Tuyauterie',t:1400,l:[L('Tuyauterie acier au carbone','t',1200,40,340000,6000),L('Supports et accessoires','t',150,60,300000,4000)]},
+{n:'Soudage et radiographie',t:1500,l:[L('Contrôle radiographique des joints','joint',6000,0.8,3500,300)]},
+{n:'Électricité',t:1300,l:[L('Câbles','ml',60000,0.22,1800,60),L('Chemins de câbles et appareillage','lot',1,6000,9000000,800000)]},
+{n:'Instrumentation',t:1400,l:[L('Boucles instrumentées (points E/S)','pt',1500,14,95000,2000)]},
+{n:'Calorifugeage et peinture',t:1200,l:[L('Calorifugeage','m²',9000,1.3,5200,100),L('Peinture industrielle','m²',40000,0.35,1400,50)]},
+{n:'Commissioning',t:1600,l:[L('Essais, mise en service','forfait',1,12000,2500000,1500000)]}]});
+const PD=[["1/2\"",0.5,21.3,[["SCH 10",2.11],["SCH 40 / STD",2.77],["SCH 80 / XS",3.73],["SCH 160",4.78],["XXS",7.47]]],["3/4\"",0.75,26.7,[["SCH 10",2.11],["SCH 40 / STD",2.87],["SCH 80 / XS",3.91],["SCH 160",5.56],["XXS",7.82]]],["1\"",1,33.4,[["SCH 10",2.77],["SCH 40 / STD",3.38],["SCH 80 / XS",4.55],["SCH 160",6.35],["XXS",9.09]]],["1\"1/4",1.25,42.2,[["SCH 10",2.77],["SCH 40 / STD",3.56],["SCH 80 / XS",4.85],["SCH 160",6.35],["XXS",9.7]]],["1\"1/2",1.5,48.3,[["SCH 10",2.77],["SCH 40 / STD",3.68],["SCH 80 / XS",5.08],["SCH 160",7.14],["XXS",10.15]]],["2\"",2,60.3,[["SCH 10",2.77],["SCH 40 / STD",3.91],["SCH 80 / XS",5.54],["SCH 160",8.74],["XXS",11.07]]],["2\"1/2",2.5,73.0,[["SCH 10",3.05],["SCH 40 / STD",5.16],["SCH 80 / XS",7.01],["SCH 160",9.53],["XXS",14.02]]],["3\"",3,88.9,[["SCH 10",3.05],["SCH 40 / STD",5.49],["SCH 80 / XS",7.62],["SCH 160",11.13],["XXS",15.24]]],["3\"1/2",3.5,101.6,[["SCH 10",3.05],["SCH 40 / STD",5.74],["SCH 80 / XS",8.08]]],["4\"",4,114.3,[["SCH 10",3.05],["SCH 40 / STD",6.02],["SCH 80 / XS",8.56],["SCH 120",11.13],["SCH 160",13.49],["XXS",17.12]]],["5\"",5,141.3,[["SCH 10",3.4],["SCH 40 / STD",6.55],["SCH 80 / XS",9.53],["SCH 120",12.7],["SCH 160",15.88],["XXS",19.05]]],["6\"",6,168.3,[["SCH 10",3.4],["SCH 40 / STD",7.11],["SCH 80 / XS",10.97],["SCH 120",14.27],["SCH 160",18.26],["XXS",21.95]]],["8\"",8,219.1,[["SCH 10",3.76],["SCH 20",6.35],["SCH 30",7.04],["SCH 40 / STD",8.18],["SCH 60",10.31],["SCH 80 / XS",12.7],["SCH 100",15.09],["SCH 120",18.26],["SCH 140",20.62],["SCH 160",23.01]]],["10\"",10,273.1,[["SCH 10",4.19],["SCH 20",6.35],["SCH 30",7.8],["SCH 40 / STD",9.27],["SCH 60 / XS",12.7],["SCH 80",15.09],["SCH 100",18.26],["SCH 120",21.44],["SCH 140",25.4],["SCH 160",28.58]]],["12\"",12,323.9,[["SCH 10",4.57],["SCH 20",6.35],["SCH 30",8.38],["STD",9.53],["SCH 40",10.31],["XS",12.7],["SCH 60",14.27],["SCH 80",17.48],["SCH 100",21.44],["SCH 120",25.4],["SCH 140",28.58],["SCH 160",33.32]]],["14\"",14,355.6,[["SCH 10",6.35],["SCH 20",7.92],["SCH 30 / STD",9.53],["SCH 40",11.13],["XS",12.7],["SCH 60",15.09],["SCH 80",19.05],["SCH 100",23.83],["SCH 120",27.79],["SCH 140",31.75],["SCH 160",35.71]]],["16\"",16,406.4,[["SCH 10",6.35],["SCH 20",7.92],["SCH 30 / STD",9.53],["SCH 40 / XS",12.7],["SCH 60",16.66],["SCH 80",21.44],["SCH 100",26.19],["SCH 120",30.96],["SCH 140",36.53],["SCH 160",40.49]]],["18\"",18,457.2,[["SCH 10",6.35],["SCH 20",7.92],["STD",9.53],["SCH 30",11.13],["XS",12.7],["SCH 40",14.27],["SCH 60",19.05],["SCH 80",23.83],["SCH 100",29.36],["SCH 120",34.93],["SCH 140",39.67],["SCH 160",45.24]]],["20\"",20,508.0,[["SCH 10",6.35],["SCH 20 / STD",9.53],["SCH 30 / XS",12.7],["SCH 40",15.09],["SCH 60",20.62],["SCH 80",26.19],["SCH 100",32.54],["SCH 120",38.1],["SCH 140",44.45],["SCH 160",50.01]]],["22\"",22,558.8,[["SCH 10",6.35],["SCH 20 / STD",9.53],["SCH 30 / XS",12.7],["SCH 60",22.23],["SCH 80",28.58],["SCH 100",34.93],["SCH 120",41.28],["SCH 140",47.63],["SCH 160",53.98]]],["24\"",24,609.6,[["SCH 10",6.35],["SCH 20 / STD",9.53],["XS",12.7],["SCH 30",14.27],["SCH 40",17.48],["SCH 60",24.61],["SCH 80",30.96],["SCH 100",38.89],["SCH 120",46.02],["SCH 140",52.37],["SCH 160",59.54]]],["26\"",26,660.4,[["SCH 10",7.92],["SCH 20 / XS",12.7],["STD",9.53]]],["28\"",28,711.2,[["SCH 10",7.92],["STD",9.53],["SCH 20 / XS",12.7],["SCH 30",15.88]]],["30\"",30,762.0,[["SCH 10",7.92],["STD",9.53],["SCH 20 / XS",12.7],["SCH 30",15.88]]],["32\"",32,812.8,[["SCH 10",7.92],["STD",9.53],["SCH 20 / XS",12.7],["SCH 30",15.88],["SCH 40",17.48]]],["34\"",34,863.6,[["SCH 10",7.92],["STD",9.53],["SCH 20 / XS",12.7],["SCH 30",15.88],["SCH 40",17.48]]],["36\"",36,914.4,[["SCH 10",7.92],["STD",9.53],["SCH 20 / XS",12.7],["SCH 30",15.88],["SCH 40",19.05]]],["38\"",38,965.2,[["STD",9.53],["XS",12.7]]],["40\"",40,1016.0,[["STD",9.53],["XS",12.7]]]];
+const TY=[{"n":"Soudage en ligne (bardage inclus)","L":12,"ch":0.6,"tr":0.5,"b0":0.03,"b1":0.0008,"cl0":0.1,"cl1":0.01,"s0":0.15,"s1":0.04,"fs":1.15,"fl":1.05},{"n":"Autour des équipements","L":4,"ch":0.8,"tr":0.6,"b0":0.35,"b1":0.014,"cl0":0.18,"cl1":0.02,"s0":0.22,"s1":0.05,"fs":1.3,"fl":1.15},{"n":"Sur pipe rack","L":6,"ch":0.7,"tr":0.55,"b0":0.22,"b1":0.008,"cl0":0.14,"cl1":0.015,"s0":0.16,"s1":0.045,"fs":1.15,"fl":1.1},{"n":"Souterraine","L":12,"ch":0.6,"tr":0.5,"b0":0.06,"b1":0.0025,"cl0":0.12,"cl1":0.012,"s0":0.18,"s1":0.048,"fs":1.1,"fl":1.05},{"n":"Incendie","L":6,"ch":0.65,"tr":0.5,"b0":0.12,"b1":0.004,"cl0":0.14,"cl1":0.014,"s0":0.18,"s1":0.048,"fs":1.1,"fl":1.05},{"n":"Cintrage des tubes","cint":1,"L":12,"nb":2,"ch":0.6,"tr":0.5,"b0":0.05,"b1":0.0015,"t0":0.15,"t1":0.01,"c0":0.4,"c1":0.045,"k0":0.08,"k1":0.004,"fs":0.9,"fl":1.5}];
+function rd(y,n,t,od){const K=Math.PI*7850/1e6*(od-t)*t;let hp,hml;
+if(y.cint){const f=n<=2?y.fs:n>=12?y.fl:1;hp=(y.ch+y.tr)*K*y.L/1000/y.nb/n+(y.b0+y.b1*K)*y.L/y.nb/n+(y.t0+y.t1*t)+(y.c0+y.c1*t)*f+(y.k0+y.k1*t);hml=hp*n*y.nb/y.L}
+else{const f=n<=2?y.fs:n>=24?y.fl:1;hp=(y.ch+y.tr)*K*y.L/1000/n+(y.b0+y.b1*K)*y.L/n+(y.cl0+y.cl1*t)*f+(y.s0+y.s1*t)*f;hml=hp*n/y.L}
+return{K,hp,hml,hkg:hml/K}}
+function openTP(i){const el=$('tp'+i);if(el.innerHTML){el.innerHTML='';return}
+el.innerHTML=`<div class="tp"><b>Rendements totaux tuyauterie (chargement, transport, bardage, clampage, soudage)</b><div class="g" style="margin:8px 0">
+<div><label>Type de tuyauterie</label><select id="tt${i}" onchange="tpU(${i})">${TY.map((x,k)=>`<option value="${k}">${x.n}</option>`).join('')}</select></div>
+<div><label>Diamètre</label><select id="td${i}" onchange="tpS(${i})">${PD.map((x,k)=>`<option value="${k}"${x[1]==6?' selected':''}>${x[0]}</option>`).join('')}</select></div>
+<div><label>Schedule</label><select id="ts${i}" onchange="tpU(${i})"></select></div>
+<div><label>Longueur (ml)</label><input id="tl${i}" type="number" value="1000" oninput="tpU(${i})"></div>
+<div><label>Prix tube (DA/kg)</label><input id="tk${i}" type="number" value="300" oninput="tpU(${i})"></div>
+<div><label>Engins (DA/ml)</label><input id="te${i}" type="number" value="0" oninput="tpU(${i})"></div></div>
+<div id="tv${i}" class="pv"></div><button class="p" onclick="tpA(${i})">Ajouter à l’estimation</button></div>`;tpS(i)}
+function tpS(i){const d=PD[$('td'+i).value];$('ts'+i).innerHTML=d[3].map((s,k)=>`<option value="${k}"${s[0]=='SCH 40 / STD'||s[0]=='STD'?' selected':''}>${s[0]} (${s[1]} mm)</option>`).join('');tpU(i)}
+function tpC(i){const d=PD[$('td'+i).value],s=d[3][$('ts'+i).value];return{d,s,r:rd(TY[$('tt'+i).value],d[1],s[1],d[2])}}
+function tpU(i){const{s,r}=tpC(i);$('tv'+i).innerHTML=`Épaisseur ${s[1]} mm · ${r.K.toFixed(2)} kg/ml · <b>${r.hp.toFixed(3)} h/pouce</b> · ${r.hml.toFixed(3)} h/ml · ${r.hkg.toFixed(4)} h/kg · ${(r.hkg*1000).toFixed(1)} h/t`}
+function tpA(i){const{d,s,r}=tpC(i);S.lots[i].l.push(L(`${TY[$('tt'+i).value].n} – ${d[0]} ${s[0]}`,'ml',+$('tl'+i).value,+r.hml.toFixed(4),Math.round(r.K*$('tk'+i).value),+$('te'+i).value));save();build()}
+
+const LDS=`Génie civil|Béton de propreté dosé à 150 kg|m³|9000
+Génie civil|Béton C25/30|m³|12000
+Génie civil|Béton C30/37|m³|13500
+Génie civil|Rond à béton HA|t|110000
+Génie civil|Treillis soudé|m²|650
+Génie civil|Coffrage bois|m²|2200
+Génie civil|Ciment CPJ 42,5|t|14000
+Génie civil|Sable de concassage|m³|2500
+Génie civil|Gravier 8/15|m³|3000
+Génie civil|Tout-venant de carrière|m³|1500
+Génie civil|Parpaing creux 20|u|70
+Génie civil|Brique creuse 12 trous|u|25
+Génie civil|Étanchéité multicouche|m²|1800
+Génie civil|Carrelage|m²|2500
+Génie civil|Enduit ciment|m²|900
+Génie civil|Géotextile|m²|250
+Charpente et acier|Profilé laminé IPE/HEA fourni|t|240000
+Charpente et acier|Tôle acier S235|t|230000
+Charpente et acier|Tôle forte S355|t|260000
+Charpente et acier|Charpente fabriquée et galvanisée|t|380000
+Charpente et acier|Boulonnerie haute résistance|kg|700
+Charpente et acier|Platines et tiges de scellement|kg|450
+Charpente et acier|Caillebotis galvanisé|m²|14000
+Charpente et acier|Bac acier de couverture|m²|2800
+Charpente et acier|Garde-corps galvanisé|ml|6500
+Charpente et acier|Échelle à crinoline|ml|18000
+Tuyauterie|Tube acier carbone API 5L Gr.B|kg|300
+Tuyauterie|Tube acier API 5L X52/X60|kg|340
+Tuyauterie|Tube inox 304L|kg|1600
+Tuyauterie|Tube acier galvanisé|kg|380
+Tuyauterie|Tube PEHD PE100|kg|450
+Tuyauterie|Coude 90° grand rayon acier carbone|kg|650
+Tuyauterie|Té égal acier carbone|kg|700
+Tuyauterie|Réduction concentrique acier carbone|kg|650
+Tuyauterie|Bride à collerette 150#|kg|800
+Tuyauterie|Bride à collerette 300#|kg|850
+Tuyauterie|Joint spirométallique|u|3500
+Tuyauterie|Goujons et écrous|kg|900
+Tuyauterie|Supports de tuyauterie standard|kg|600
+Robinetterie|Vanne à opercule 150# – 6"|u|220000
+Robinetterie|Vanne à boisseau sphérique 150# – 4"|u|150000
+Robinetterie|Clapet anti-retour 150# – 6"|u|180000
+Robinetterie|Vanne papillon 150# – 12"|u|350000
+Robinetterie|Vanne de régulation – 4"|u|1200000
+Robinetterie|Soupape de sécurité 2"×3"|u|600000
+Soudage et contrôle|Électrodes E7018|kg|900
+Soudage et contrôle|Électrodes E6010|kg|800
+Soudage et contrôle|Fil TIG ER70S-2|kg|1100
+Soudage et contrôle|Fil MIG/MAG|kg|700
+Soudage et contrôle|Argon|m³|900
+Soudage et contrôle|Disques à meuler|u|300
+Soudage et contrôle|Film radiographique 30×40|u|450
+Soudage et contrôle|Kit de ressuage / magnétoscopie|u|12000
+Électricité|Câble U1000 R2V 3×2,5 mm²|ml|350
+Électricité|Câble U1000 R2V 4×16 mm²|ml|1500
+Électricité|Câble U1000 R2V 4×95 mm²|ml|9500
+Électricité|Câble MT 18/30 kV 3×240 mm²|ml|28000
+Électricité|Chemin de câbles galvanisé|ml|3500
+Électricité|Tube acier galvanisé pour câbles|ml|600
+Électricité|Cuivre nu 50 mm² (mise à la terre)|ml|1800
+Électricité|Luminaire LED industriel|u|38000
+Électricité|Tableau BT (armoire)|u|3500000
+Électricité|Cellule MT|u|4500000
+Électricité|Transformateur 1000 kVA|u|6500000
+Électricité|Groupe électrogène 500 kVA|u|14000000
+Instrumentation|Transmetteur de pression|u|180000
+Instrumentation|Transmetteur de température|u|150000
+Instrumentation|Transmetteur de niveau radar|u|650000
+Instrumentation|Débitmètre Coriolis|u|2500000
+Instrumentation|Détecteur de gaz / flamme|u|450000
+Instrumentation|Câble d’instrumentation 2 paires blindé|ml|900
+Instrumentation|Tubing inox 316|ml|2500
+Instrumentation|Armoire automate (PLC)|u|6000000
+Calorifugeage et peinture|Laine de roche + tôle aluminium|m²|5200
+Calorifugeage et peinture|Mousse élastomère|m²|3800
+Calorifugeage et peinture|Sablage SA 2,5|m²|700
+Calorifugeage et peinture|Primaire riche en zinc|m²|900
+Calorifugeage et peinture|Peinture époxy industrielle|m²|1400
+Calorifugeage et peinture|Peinture intumescente|m²|6000
+Équipements|Pompe centrifuge de process|u|5000000
+Équipements|Échangeur tubes / calandre|t|1800000
+Équipements|Ballon sous pression|t|1500000
+Équipements|Bac de stockage (tôlerie)|t|340000
+Équipements|Pont roulant 10 t|u|8000000
+Consommables et engins|Gasoil|l|29
+Consommables et engins|Eau industrielle|m³|150
+Consommables et engins|Location grue mobile 50 t|h|25000
+Consommables et engins|Location camion-grue|h|8000
+Consommables et engins|Location échafaudage|m²/mois|250`;
+const LD=()=>LDS.trim().split('\n').map(s=>{const a=s.split('|');return{c:a[0],n:a[1],u:a[2],p:+a[3]}});
+let LIB;try{LIB=JSON.parse(localStorage.getItem('epc_lib'))}catch(e){}
+if(!Array.isArray(LIB)||!LIB.length)LIB=LD();LIB.forEach(x=>{if(!x.c)x.c='Divers'});
+let LQ='',LC='';const sl=()=>{try{localStorage.setItem('epc_lib',JSON.stringify(LIB))}catch(e){}};
+const lcats=()=>[...new Set(LIB.map(x=>x.c))];
+function libOpts(){return lcats().map(c=>`<optgroup label="${c}">${LIB.map((x,q)=>x.c==c?`<option value="${q}">${x.n} · ${x.p} DA/${x.u}</option>`:'').join('')}</optgroup>`).join('')}
+function renderLib(){$('lib').innerHTML=`<div class="lh"><b>Bibliothèque de prix matières (DA)</b><span style="color:var(--mu);font-size:12px">Prix de départ indicatifs : à remplacer par vos prix. Sélecteur « Bibl. » dans la colonne PU matière des lignes.</span></div>
+<div class="g" style="margin-bottom:8px"><div><label>Recherche</label><input value="${LQ.replace(/"/g,'&quot;')}" oninput="LQ=this.value;renderLibB()" placeholder="ex. câble, vanne, tube…"></div>
+<div><label>Catégorie</label><select onchange="LC=this.value;renderLibB()"><option value="">Toutes</option>${lcats().map(c=>`<option${c==LC?' selected':''}>${c}</option>`).join('')}</select></div></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button onclick="LQ='';LIB.unshift({c:LC||'Divers',n:'Nouvelle matière',u:'u',p:0});sl();build()">+ Matière</button><button onclick="loadDef()">Charger la bibliothèque de départ</button></div>
+<div id="libb"></div><datalist id="cl">${lcats().map(c=>`<option value="${c}">`).join('')}</datalist>
+<details style="margin-top:8px"><summary style="cursor:pointer">Importer depuis Excel (copier-coller)</summary><div class="sub" style="margin:6px 0">Collez des lignes « Matière ; Unité ; Prix ; Catégorie (facultatif) », séparées par une tabulation (copie Excel) ou un point-virgule. Une matière déjà présente est mise à jour.</div>
+<textarea id="libi" rows="5" style="width:100%;padding:6px;border:1px solid var(--bd);border-radius:6px;background:var(--in);color:var(--tx);font:inherit"></textarea><button class="p" style="margin-top:6px" onclick="impLib()">Importer</button></details><div id="libm" class="sub" style="margin-top:6px"></div>`;renderLibB()}
+function renderLibB(){const q=LQ.toLowerCase();let n=0;const r=LIB.map((x,k)=>{if((LC&&x.c!=LC)||(q&&!(x.n+' '+x.c).toLowerCase().includes(q)))return'';n++;
+return`<tr><td><input list="cl" value="${x.c}" onchange="LIB[${k}].c=this.value;sl();build()"></td><td><input value="${x.n.replace(/"/g,'&quot;')}" onchange="LIB[${k}].n=this.value;sl();build()"></td><td><input style="width:60px" value="${x.u}" onchange="LIB[${k}].u=this.value;sl();build()"></td><td><input type="number" step="any" style="text-align:right" value="${x.p}" onchange="LIB[${k}].p=+this.value;sl();build()"></td><td><button class="x" onclick="LIB.splice(${k},1);sl();build()">×</button></td></tr>`}).join('');
+$('libb').innerHTML=`<div class="sc" style="max-height:420px;overflow-y:auto"><table style="min-width:560px"><thead><tr><th>Catégorie</th><th>Matière</th><th>Unité</th><th>Prix (DA)</th><th></th></tr></thead><tbody>${r}</tbody></table></div><div class="sub" style="margin-top:4px">${n} matière(s) affichée(s) sur ${LIB.length}</div>`}
+function loadDef(){const ex=new Set(LIB.map(x=>x.n.toLowerCase()));let n=0;LD().forEach(x=>{if(!ex.has(x.n.toLowerCase())){LIB.push(x);n++}});sl();build();$('libm').textContent=n+' matière(s) ajoutée(s) depuis la bibliothèque de départ.'}
+function impLib(){let a=0,u=0;$('libi').value.split('\n').forEach(s=>{const c=s.split(/\t|;/).map(x=>x.trim());if(c.length<3)return;const p=parseFloat(c[2].replace(/\s/g,'').replace(',','.'));if(!c[0]||isNaN(p))return;
+const i=LIB.findIndex(x=>x.n.toLowerCase()==c[0].toLowerCase());if(i>=0){LIB[i].u=c[1];LIB[i].p=p;if(c[3])LIB[i].c=c[3];u++}else{LIB.push({c:c[3]||'Divers',n:c[0],u:c[1],p});a++}});
+sl();build();$('libm').textContent=a+' ajoutée(s), '+u+' mise(s) à jour.'}
+function pickLib(i,j,k){if(k==='')return;S.lots[i].l[j].m=LIB[k].p;save();build()}
+async function sv(name,data){const d=window.claude?await claude.use('downloads'):null;if(!d){alert('Téléchargement indisponible dans cette vue.');return}try{await d.save({filename:name,data})}catch(e){if(!e||e.code!='declined')alert('Export impossible : '+((e&&(e.message||e.code))||''))}}
+function rows(){const r=[['Corps d’état','Désignation','Unité','Quantité','Rendement (h/unité)','PU matière (DA)','PU engins (DA)','Taux horaire (DA/h)','Heures','MO (DA)','Matières (DA)','Engins (DA)','Total (DA)']];S.lots.forEach(o=>o.l.forEach(l=>{const k=lc(l,o.t);r.push([o.n,l.d,l.u,l.q,l.r,l.m,l.e,o.t,l.q*l.r,k.mo,k.ma,k.en,k.tt])}));return r}
+function expC(){sv('estimation_epc.csv','\uFEFF'+rows().map(r=>r.map(v=>String(v).replace(/;/g,',')).join(';')).join('\n'))}
+function expX(){if(typeof XLSX=='undefined'){alert('Bibliothèque Excel non chargée.');return}
+const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows()),'Estimation');
+const sy=[['Corps d’état','MO (DA)','Matières (DA)','Engins (DA)','Total (DA)']];S.lots.forEach(o=>{const s=lt(o);sy.push([o.n,s.mo,s.ma,s.en,s.tt])});
+XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(sy),'Synthèse');
+XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Matière','Unité','Prix (DA)'],...LIB.map(x=>[x.n,x.u,x.p])]),'Prix matières');
+sv('estimation_epc.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))}
+function expP(){const P=[['WBS Code','WBS Name','Activity ID','Activity Name','Budgeted Labor Units (h)','Budgeted Labor Cost','Budgeted Nonlabor Cost','Budgeted Total Cost']];
+S.lots.forEach((o,i)=>o.l.forEach((l,j)=>{const k=lc(l,o.t),w=i+1;P.push([String(w),o.n,'A'+w+String(j+1).padStart(3,'0'),l.d,Math.round(l.q*l.r),Math.round(k.mo),Math.round(k.ma+k.en),Math.round(k.tt)])}));
+sv('primavera_p6_activites.csv','\uFEFF'+P.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n'))}
+try{window.claude&&claude.use('downloads').then(d=>{if(!d)$('exb').style.display='none'})}catch(e){}
+let S;try{S=JSON.parse(localStorage.getItem('epc_est'))}catch(e){}if(!S||!S.lots)S=def();
+const save=()=>{try{localStorage.setItem('epc_est',JSON.stringify(S))}catch(e){}};
+const $=i=>document.getElementById(i),f=x=>Math.round(x).toLocaleString('fr-FR');
+function lc(l,t){const mo=l.q*l.r*t,ma=l.q*l.m,en=l.q*l.e;return{mo,ma,en,tt:mo+ma+en}}
+function lt(o){return o.l.reduce((a,l)=>{const c=lc(l,o.t);return{mo:a.mo+c.mo,ma:a.ma+c.ma,en:a.en+c.en,tt:a.tt+c.tt}},{mo:0,ma:0,en:0,tt:0})}
+function build(){
+$('par').innerHTML=[['nom','Nom du projet','text'],['fg','Frais généraux (%)'],['al','Aléas (%)'],['bn','Bénéfice (%)'],['tva','TVA (%)']].map(([k,n,t])=>`<div><label>${n}</label><input type="${t||'number'}" step="any" value="${S[k]}" onchange="S.${k}=${t?'this.value':'+this.value'};upd()"></div>`).join('');
+$('lots').innerHTML=S.lots.map((o,i)=>`<div class="card"><div class="lh"><b><input style="width:240px;font-weight:700" value="${o.n}" onchange="S.lots[${i}].n=this.value;upd()"></b>
+<span>Taux horaire MO (DA/h) <input style="width:90px" type="number" value="${o.t}" onchange="S.lots[${i}].t=+this.value;upd()"></span><span class="t" id="lt${i}"></span>${/tuyau/i.test(o.n)?`<button class="p" onclick="openTP(${i})">+ Depuis rendements tuyauterie</button>`:''}
+<button class="x" onclick="if(confirm('Supprimer ce corps d’état ?')){S.lots.splice(${i},1);save();build()}">Supprimer</button></div><div id="tp${i}"></div>
+<div class="sc"><table><thead><tr><th>Désignation</th><th>Unité</th><th>Quantité</th><th>Rend. (h/unité)</th><th>PU matière</th><th>PU engins</th><th>MO</th><th>Matières</th><th>Engins</th><th>Total</th><th></th></tr></thead><tbody>
+${o.l.map((l,j)=>`<tr><td><input value="${l.d}" onchange="S.lots[${i}].l[${j}].d=this.value;upd()"></td><td><input value="${l.u}" onchange="S.lots[${i}].l[${j}].u=this.value;upd()"></td>
+${['q','r','m','e'].map(k=>`<td><input type="number" step="any" style="text-align:right" value="${l[k]}" onchange="S.lots[${i}].l[${j}].${k}=+this.value;upd()">${k=='m'?`<select style="width:74px;font-size:11px;margin-top:2px;padding:2px" onchange="pickLib(${i},${j},this.value)"><option value="">Bibl.</option>${libOpts()}</select>`:''}</td>`).join('')}
+<td class="n" id="a${i}_${j}"></td><td class="n" id="b${i}_${j}"></td><td class="n" id="c${i}_${j}"></td><td class="n t" id="d${i}_${j}"></td>
+<td><button class="x" onclick="S.lots[${i}].l.splice(${j},1);save();build()">×</button></td></tr>`).join('')}</tbody></table></div>
+<button style="margin-top:6px" onclick="S.lots[${i}].l.push(L('Nouvelle ligne','u',0,0,0,0));save();build()">+ Ligne</button></div>`).join('');
+renderLib();upd()}
+function upd(){let T={mo:0,ma:0,en:0,tt:0};
+S.lots.forEach((o,i)=>{o.l.forEach((l,j)=>{const c=lc(l,o.t);$('a'+i+'_'+j).textContent=f(c.mo);$('b'+i+'_'+j).textContent=f(c.ma);$('c'+i+'_'+j).textContent=f(c.en);$('d'+i+'_'+j).textContent=f(c.tt)});
+const s=lt(o);$('lt'+i).textContent='Sous-total : '+f(s.tt)+' DA';['mo','ma','en','tt'].forEach(k=>T[k]+=s[k])});
+const mx=Math.max(1,...S.lots.map(o=>lt(o).tt));
+$('syn').innerHTML=S.lots.map(o=>{const s=lt(o);return`<div class="row"><span>${o.n}</span><div><div class="bar" style="width:${s.tt/mx*100}%"></div></div><span class="t" style="text-align:right">${f(s.tt)}</span></div>`}).join('');
+const fg=T.tt*S.fg/100,al=(T.tt+fg)*S.al/100,bn=(T.tt+fg+al)*S.bn/100,ht=T.tt+fg+al+bn,tv=ht*S.tva/100;
+const r=[['Main-d’œuvre',T.mo],['Matières',T.ma],['Engins et sous-traitance',T.en],['Coût direct',T.tt],['Frais généraux ('+S.fg+' %)',fg],['Aléas ('+S.al+' %)',al],['Bénéfice ('+S.bn+' %)',bn],['Total HT',ht],['TVA ('+S.tva+' %)',tv]];
+$('tot').innerHTML=r.map(([a,b],i)=>`<tr><td${i==3||i==7?' style="font-weight:700"':''}>${a}</td><td class="n${i==3||i==7?' t':''}">${f(b)} DA</td></tr>`).join('')+`<tr><td class="big">Total TTC</td><td class="n big">${f(ht+tv)} DA</td></tr>`;
+save()}
+function addLot(){S.lots.push({n:'Nouveau corps d’état',t:1200,l:[L('Nouvelle ligne','u',0,0,0,0)]});save();build()}
+build();
+</script></body></html>
