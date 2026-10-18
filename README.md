@@ -16,7 +16,8 @@ Outil d'estimation rapide des coûts EPC (Engineering, Procurement & Constructio
 ✅ Interface web intuitive
 
 📷 Aperçu
-(image ici)
+<img width="1298" height="3761" alt="ESTIMATION DES COUTS (Application)" src="https://github.com/user-attachments/assets/7d23b451-8120-4b1b-bd1a-044c4c1fe8f2" />
+<img width="1298" height="3761" alt="ESTIMATION DES COUTS (Application)" src="https://github.com/user-attachments/assets/ad32d757-7e45-4748-b6a2-e8f6a3030e90" />
 
 📖 Comment utiliser l'outil
 Ouvrir l'application
